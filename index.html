@@ -1,0 +1,579 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Stack &amp; Queue Workbench</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Fragment+Mono&display=swap">
+<style>
+  /* Layout: one lane at a time on engineering computation-pad paper; a vertical well for the stack, a horizontal node chain for the queue */
+  :root {
+    --paper: #E6ECE2;
+    --grid: #D5DED1;
+    --field: #F3F6F0;
+    --ink: #1D2928;
+    --muted: #56655F;
+    --rule: #A9B8AE;
+    --box: #2E5C9C;
+    --box-ink: #F3F5EF;
+    --edge: #1D2928;
+    --shadow: #1D2928;
+    --mark: #F0BE48;
+    --mark-ink: #1D2928;
+    --error: #A93A2A;
+
+    --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+    --body: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "Fragment Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #121917; --grid: #1B2421; --field: #0C1211; --ink: #E2E9E1; --muted: #93A39C;
+      --rule: #34423D; --box: #3E70B8; --box-ink: #F5F7F2; --edge: #0A0F0E; --shadow: #000000;
+      --mark: #E2B045; --mark-ink: #121917; --error: #EA8A79;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #121917; --grid: #1B2421; --field: #0C1211; --ink: #E2E9E1; --muted: #93A39C;
+    --rule: #34423D; --box: #3E70B8; --box-ink: #F5F7F2; --edge: #0A0F0E; --shadow: #000000;
+    --mark: #E2B045; --mark-ink: #121917; --error: #EA8A79;
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 24px 24px;
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.5;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 32px 56px;
+  }
+  .page { max-width: 760px; margin-inline: auto; display: grid; gap: 32px; }
+
+  header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px; }
+  header h1 {
+    font-family: var(--display);
+    font-variation-settings: "wdth" 70;
+    font-weight: 800;
+    font-size: clamp(2rem, 5.5vw, 3rem);
+    line-height: 1;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  /* Stack / Queue toggle */
+  .switch { display: flex; border: 1.5px solid var(--ink); border-radius: 2px; box-shadow: 3px 3px 0 var(--ink); }
+  .switch input { position: absolute; opacity: 0; pointer-events: none; }
+  .switch label {
+    font-weight: 600;
+    font-size: 15px;
+    padding: 8px 18px;
+    cursor: pointer;
+    background: var(--field);
+    transition: background-color 120ms, color 120ms;
+  }
+  .switch label + input + label { border-left: 1.5px solid var(--ink); }
+  .switch label:hover { background: var(--mark); color: var(--mark-ink); }
+  .switch input:checked + label { background: var(--ink); color: var(--paper); }
+  .switch input:focus-visible + label { outline: 3px solid var(--mark); outline-offset: 2px; }
+
+  .lane { display: grid; gap: 24px; min-width: 0; }
+
+  /* Stack well */
+  .well {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 6px;
+    min-height: 300px;
+    padding: 16px 0 6px 18px;
+    border-bottom: 3px solid var(--ink);
+  }
+  .well:empty::before {
+    content: "empty";
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .box {
+    width: 150px;
+    height: 44px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    position: relative;
+    background: var(--box);
+    color: var(--box-ink);
+    border: 1.5px solid var(--edge);
+    border-radius: 2px;
+    box-shadow: 3px 3px 0 var(--shadow);
+    font-family: var(--mono);
+    font-size: 18px;
+    rotate: var(--tilt, 0deg);
+    outline: 3px solid transparent;
+    outline-offset: 3px;
+    transition: outline-color 0.25s;
+  }
+  .box.is-top::after {
+    content: "\2190 top";
+    position: absolute;
+    left: calc(100% + 14px);
+    top: 50%;
+    translate: 0 -50%;
+    rotate: calc(var(--tilt, 0deg) * -1);
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .peeked { outline-color: var(--mark); }
+
+  /* Queue chain */
+  .chain-wrap { overflow-x: auto; padding-block: 34px; border-bottom: 1.5px dashed var(--rule); }
+  .chain {
+    display: flex;
+    align-items: center;
+    position: relative;
+    width: max-content;
+    min-height: 52px;
+    padding-inline: 2px 8px;
+  }
+  .node { display: flex; align-items: center; position: relative; flex: none; }
+  .cell {
+    display: flex;
+    height: 44px;
+    position: relative;
+    background: var(--box);
+    color: var(--box-ink);
+    border: 1.5px solid var(--edge);
+    border-radius: 2px;
+    box-shadow: 3px 3px 0 var(--shadow);
+    font-family: var(--mono);
+    outline: 3px solid transparent;
+    outline-offset: 3px;
+    transition: outline-color 0.25s;
+  }
+  .cell .val {
+    display: grid;
+    place-items: center;
+    min-width: 3ch;
+    padding-inline: 14px;
+    font-size: 18px;
+  }
+  .cell .next {
+    width: 22px;
+    border-left: 1.5px solid color-mix(in srgb, var(--box-ink) 45%, transparent);
+    display: grid;
+    place-items: center;
+  }
+  .cell .next::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .arrow {
+    width: 34px;
+    height: 2px;
+    background: var(--ink);
+    position: relative;
+    margin: 0 9px 0 0;
+  }
+  .arrow::after {
+    content: "";
+    position: absolute;
+    right: -7px;
+    top: -4px;
+    border-left: 8px solid var(--ink);
+    border-block: 5px solid transparent;
+  }
+  .node.is-head::before,
+  .node.is-tail .cell::after,
+  .null.empty::before,
+  .null.empty::after {
+    position: absolute;
+    left: 0;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .node.is-head::before { content: "head"; bottom: calc(100% + 10px); }
+  .node.is-tail .cell::after { content: "tail"; top: calc(100% + 10px); }
+  .null {
+    position: relative;
+    flex: none;
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--muted);
+    border: 1.5px dashed var(--muted);
+    border-radius: 2px;
+    padding: 9px 12px;
+  }
+  .null.empty::before { content: "head"; bottom: calc(100% + 10px); }
+  .null.empty::after { content: "tail"; top: calc(100% + 10px); }
+
+  /* Controls: the text box and its add button form one group; remove/peek sit apart */
+  .ops { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px 32px; }
+  @media (min-width: 560px) {
+    .ops .actions { border-left: 1.5px solid var(--rule); padding-left: 32px; }
+  }
+  .add { display: grid; gap: 6px; }
+  .add label {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .attach {
+    display: flex;
+    border: 1.5px solid var(--ink);
+    border-radius: 2px;
+    box-shadow: 3px 3px 0 var(--ink);
+    transition: transform 80ms, box-shadow 80ms;
+  }
+  .attach:has(button:active) { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink); }
+  .attach input {
+    font-family: var(--mono);
+    font-size: 16px;
+    width: 9rem;
+    padding: 8px 10px;
+    color: var(--ink);
+    background: var(--field);
+    border: 0;
+    border-right: 1.5px solid var(--ink);
+    border-radius: 0;
+  }
+  .attach button { border: 0; border-radius: 0; box-shadow: none; }
+  .attach button:active { transform: none; }
+  .actions { display: flex; gap: 12px; }
+
+  button {
+    font-family: var(--body);
+    font-weight: 600;
+    font-size: 15px;
+    padding: 8px 16px;
+    color: var(--ink);
+    background: var(--field);
+    border: 1.5px solid var(--ink);
+    border-radius: 2px;
+    box-shadow: 3px 3px 0 var(--ink);
+    cursor: pointer;
+    transition: transform 80ms, box-shadow 80ms, background-color 120ms;
+  }
+  button:hover { background: var(--mark); color: var(--mark-ink); }
+  button.primary { background: var(--ink); color: var(--paper); }
+  button.primary:hover { background: var(--mark); color: var(--mark-ink); }
+  button:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink); }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--mark); outline-offset: 2px; }
+
+  /* Result + call log */
+  .readout { display: flex; align-items: baseline; gap: 12px; min-height: 34px; }
+  .ro-label, .log-label {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .ro-val { font-family: var(--mono); font-size: 22px; display: inline-block; }
+  .ro-val.value { background: var(--mark); color: var(--mark-ink); padding: 0 6px; }
+  .ro-val.void, .ro-val.null { color: var(--muted); }
+  .ro-val.error { color: var(--error); font-size: 17px; }
+
+  .history:has(.log:empty) { display: none; }
+  .log {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+    font-family: var(--mono);
+    font-size: 13px;
+    display: grid;
+    gap: 3px;
+  }
+  .log li { display: flex; flex-wrap: wrap; column-gap: 12px; }
+  .log li:not(:first-child) { opacity: 0.55; }
+  .log .res { color: var(--muted); }
+  .log .res.error { color: var(--error); }
+
+  @media (prefers-reduced-motion: reduce) {
+    button, .box, .cell, .attach { transition: none; }
+  }
+</style>
+
+<div class="page">
+  <header>
+    <h1>Stack &amp; Queue Workbench</h1>
+    <div class="switch" role="radiogroup" aria-label="Data structure">
+      <input type="radio" name="mode" id="mode-stack" value="stack" checked>
+      <label for="mode-stack">Stack</label>
+      <input type="radio" name="mode" id="mode-queue" value="queue">
+      <label for="mode-queue">Queue</label>
+    </div>
+  </header>
+
+  <main>
+    <section class="lane" id="stack-lane" aria-label="Stack">
+      <div class="well" id="stack" role="list" aria-label="Stack contents, bottom to top"></div>
+
+      <div class="ops">
+        <form class="add" id="stack-form">
+          <label for="stack-input">Value</label>
+          <div class="attach">
+            <input id="stack-input" maxlength="8" autocomplete="off" placeholder="e.g. 7" required>
+            <button type="submit" class="primary">Push</button>
+          </div>
+        </form>
+        <div class="actions">
+          <button type="button" id="stack-pop">Pop</button>
+          <button type="button" id="stack-peek">Peek</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="readout" aria-live="polite">
+          <span class="ro-label" id="stack-label">Returned</span>
+          <output class="ro-val void" id="stack-out">&mdash;</output>
+        </div>
+        <div class="history">
+          <span class="log-label">Calls</span>
+          <ol class="log" id="stack-log"></ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="lane" id="queue-lane" aria-label="Queue" hidden>
+      <div class="chain-wrap" id="queue-wrap">
+        <div class="chain" id="queue" role="list" aria-label="Queue contents, head to tail">
+          <span class="null empty" id="queue-null">null</span>
+        </div>
+      </div>
+
+      <div class="ops">
+        <form class="add" id="queue-form">
+          <label for="queue-input">Value</label>
+          <div class="attach">
+            <input id="queue-input" maxlength="8" autocomplete="off" placeholder="e.g. 7" required>
+            <button type="submit" class="primary">Offer</button>
+          </div>
+        </form>
+        <div class="actions">
+          <button type="button" id="queue-poll">Poll</button>
+          <button type="button" id="queue-peek">Peek</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="readout" aria-live="polite">
+          <span class="ro-label" id="queue-label">Returned</span>
+          <output class="ro-val void" id="queue-out">&mdash;</output>
+        </div>
+        <div class="history">
+          <span class="log-label">Calls</span>
+          <ol class="log" id="queue-log"></ol>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+  const motion = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1;
+  const ms = d => d * motion;
+
+  const $ = id => document.getElementById(id);
+  const javaString = v => JSON.stringify(v);
+
+  // Show a return value (or exception) and add the call to the log.
+  function report(prefix, call, result, kind) {
+    $(prefix + '-label').textContent = kind === 'error' ? 'Threw' : 'Returned';
+    const out = $(prefix + '-out');
+    out.textContent = result;
+    out.className = 'ro-val ' + kind;
+    out.animate([{ transform: 'scale(1.15)' }, { transform: 'none' }],
+                { duration: ms(260), easing: 'ease-out' });
+
+    const li = document.createElement('li');
+    const code = document.createElement('code');
+    const res = document.createElement('span');
+    code.textContent = call;
+    res.textContent = kind === 'error' ? 'throws ' + result : '→ ' + result;
+    res.className = 'res' + (kind === 'error' ? ' error' : '');
+    li.append(code, res);
+    const log = $(prefix + '-log');
+    log.prepend(li);
+    while (log.children.length > 6) log.lastElementChild.remove();
+  }
+
+  function shake(el) {
+    el.animate([{ translate: '0' }, { translate: '-6px' }, { translate: '6px' }, { translate: '0' }],
+               { duration: ms(240) });
+  }
+
+  // Briefly lift an element and ring it with the highlight color.
+  function flash(el) {
+    el.animate([{ transform: 'none' }, { transform: 'translateY(-10px)', offset: 0.4 }, { transform: 'none' }],
+               { duration: ms(420), easing: 'ease-out' });
+    el.classList.add('peeked');
+    setTimeout(() => el.classList.remove('peeked'), 900);
+  }
+
+  /* ---------- Stack ---------- */
+
+  const stackEl = $('stack');
+  const stack = []; // box elements, bottom -> top
+
+  function markTop() {
+    stack.forEach((box, i) => box.classList.toggle('is-top', i === stack.length - 1));
+  }
+
+  function push(value) {
+    const box = document.createElement('div');
+    box.className = 'box';
+    box.setAttribute('role', 'listitem');
+    box.textContent = value;
+    box.style.setProperty('--tilt', (Math.random() * 3 - 1.5).toFixed(2) + 'deg');
+    stackEl.append(box);
+    stack.push(box);
+    markTop();
+    box.animate([
+      { transform: 'translateY(-200px)', opacity: 0 },
+      { transform: 'translateY(5px)', opacity: 1, offset: 0.75 },
+      { transform: 'none' }
+    ], { duration: ms(450), easing: 'cubic-bezier(.35,.1,.4,1)' });
+    report('stack', `stack.push(${javaString(value)})`, 'void', 'void');
+  }
+
+  function pop() {
+    const box = stack.pop();
+    if (!box) {
+      shake(stackEl);
+      return report('stack', 'stack.pop()', 'NoSuchElementException', 'error');
+    }
+    box.classList.remove('is-top');
+    markTop();
+    box.animate([
+      { transform: 'none', opacity: 1 },
+      { transform: 'translate(60px, -110px) rotate(10deg)', opacity: 0 }
+    ], { duration: ms(400), easing: 'cubic-bezier(.5,0,.75,.35)', fill: 'forwards' })
+      .finished.then(() => box.remove());
+    report('stack', 'stack.pop()', javaString(box.textContent), 'value');
+  }
+
+  function peekStack() {
+    const box = stack.at(-1);
+    if (!box) return report('stack', 'stack.peek()', 'null', 'null');
+    flash(box);
+    report('stack', 'stack.peek()', javaString(box.textContent), 'value');
+  }
+
+  /* ---------- Queue ---------- */
+
+  const chainEl = $('queue');
+  const nullEl = $('queue-null');
+  const queue = []; // node elements, head -> tail
+
+  function markEnds() {
+    queue.forEach((node, i) => {
+      node.classList.toggle('is-head', i === 0);
+      node.classList.toggle('is-tail', i === queue.length - 1);
+    });
+    nullEl.classList.toggle('empty', queue.length === 0);
+  }
+
+  // FLIP: measure, change the layout, then animate each element from where it was.
+  function flip(elements, change) {
+    const before = elements.map(el => el.getBoundingClientRect());
+    change();
+    elements.forEach((el, i) => {
+      const dx = before[i].left - el.getBoundingClientRect().left;
+      if (dx) el.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }],
+                         { duration: ms(320), easing: 'cubic-bezier(.2,.7,.2,1)' });
+    });
+  }
+
+  function offer(value) {
+    const node = document.createElement('div');
+    node.className = 'node';
+    node.setAttribute('role', 'listitem');
+    node.innerHTML = '<div class="cell"><span class="val"></span><span class="next" aria-hidden="true"></span></div>' +
+                     '<span class="arrow" aria-hidden="true"></span>';
+    node.querySelector('.val').textContent = value;
+
+    flip([nullEl], () => chainEl.insertBefore(node, nullEl));
+    queue.push(node);
+    markEnds();
+    node.animate([{ opacity: 0, transform: 'translateX(30px)' }, { opacity: 1, transform: 'none' }],
+                 { duration: ms(320), easing: 'cubic-bezier(.2,.7,.2,1)' });
+    const wrap = $('queue-wrap');
+    wrap.scrollTo({ left: wrap.scrollWidth, behavior: motion ? 'smooth' : 'auto' });
+    report('queue', `queue.offer(${javaString(value)})`, 'true', 'void');
+  }
+
+  function poll() {
+    const node = queue.shift();
+    if (!node) {
+      shake(nullEl);
+      return report('queue', 'queue.poll()', 'null', 'null');
+    }
+    node.classList.remove('is-head', 'is-tail');
+    // Lift the old head out of the flow so the rest can slide left while it leaves.
+    flip([...queue, nullEl], () => {
+      const x = node.offsetLeft, y = node.offsetTop;
+      node.style.position = 'absolute';
+      node.style.left = x + 'px';
+      node.style.top = y + 'px';
+    });
+    markEnds();
+    node.animate([
+      { transform: 'none', opacity: 1 },
+      { transform: 'translateY(-60px)', opacity: 0 }
+    ], { duration: ms(360), easing: 'cubic-bezier(.5,0,.75,.35)', fill: 'forwards' })
+      .finished.then(() => node.remove());
+    report('queue', 'queue.poll()', javaString(node.querySelector('.val').textContent), 'value');
+  }
+
+  function peekQueue() {
+    const node = queue[0];
+    if (!node) return report('queue', 'queue.peek()', 'null', 'null');
+    flash(node.querySelector('.cell'));
+    report('queue', 'queue.peek()', javaString(node.querySelector('.val').textContent), 'value');
+  }
+
+  /* ---------- Wiring ---------- */
+
+  function bindForm(formId, inputId, action) {
+    $(formId).addEventListener('submit', e => {
+      e.preventDefault();
+      const input = $(inputId);
+      const value = input.value.trim();
+      input.value = '';
+      input.focus();
+      if (value) action(value);
+    });
+  }
+
+  bindForm('stack-form', 'stack-input', push);
+  bindForm('queue-form', 'queue-input', offer);
+  $('stack-pop').addEventListener('click', pop);
+  $('stack-peek').addEventListener('click', peekStack);
+  $('queue-poll').addEventListener('click', poll);
+  $('queue-peek').addEventListener('click', peekQueue);
+
+  document.querySelectorAll('input[name="mode"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      $('stack-lane').hidden = radio.value !== 'stack';
+      $('queue-lane').hidden = radio.value !== 'queue';
+    });
+  });
+</script>
+
+</body></html>
